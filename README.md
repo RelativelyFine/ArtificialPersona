@@ -8,3 +8,4 @@ Similar projects include Anonymous Internet Browsing tools like Tor, virtual pri
 anonymous communication apps such as Signal and Whisper. However, most of these tools focus on
 textual communication and anonymization of IP addresses, and do not extend to visual and voice-based
 interactions.
+ 
