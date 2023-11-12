@@ -55,13 +55,14 @@ class Transcriber:
 
     def send_to_tts(buffer):
         # fill this in later with the logic to send the text to the text to speech modle
-        pass
+        print(buffer)
+        
 
     def update_and_send_to_buffer(self, new_phrase):
         self.audio_buffer.append(new_phrase)
 
         if len(self.audio_buffer == 2):
-            send_to_tts(self.audio_buffer)
+            self.send_to_tts(self.audio_buffer)
 
             self.audio_buffer = []
 
