@@ -1,4 +1,3 @@
-#! python3.10.9
 
 import argparse
 import io
@@ -6,8 +5,6 @@ import os
 import speech_recognition as sr
 import whisper
 import torch
-
-
 
 from datetime import datetime, timedelta
 from queue import Queue
@@ -29,6 +26,7 @@ class Transcriber:
         self.temp_file = NamedTemporaryFile().name
         self.output_file = open('hello.txt', w)
         self.transcription = ['']
+        self.audio_buffer = []
 
     # load the model given the 
     def load_model(self, model_name, non_english):
@@ -54,6 +52,18 @@ class Transcriber:
     def record_callback(self, recgonizer, audio: sr.AudioData):
         data = audio.get_raw_data()
         self.data_queue.put(data) 
+
+    def send_to_tts(buffer):
+        # fill this in later with the logic to send the text to the text to speech modle
+        pass
+
+    def update_and_send_to_buffer(self, new_phrase):
+        self.audio_buffer.append(new_phrase)
+
+        if len(self.audio_buffer == 2):
+            send_to_tts(self.audio_buffer)
+
+            self.audio_buffer = []
 
     def transcribe_audio(self):
         while True:
@@ -86,6 +96,8 @@ class Transcriber:
                     # Read the transcription.
                     result = self.model.transcripe(self.temp_file, fp16=torch.cuda.is_available())
                     text = result['text'].strip()
+
+                    self.update_and_send_to_buffer(text)
 
                     # If we detected a pause between recordings, add a new item to our transcription.
                     # Otherwise edit the existing one.
@@ -125,10 +137,6 @@ class Transcriber:
 
         print("Model loaded\n")
         self.transcribe_audio()
-
-
-
-
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
