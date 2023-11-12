@@ -55,8 +55,10 @@ class Transcriber:
 
     def send_to_tts(buffer):
         # fill this in later with the logic to send the text to the text to speech modle
-        print(buffer)
-        
+        with open(testing.txt, 'w+b') as f:
+            for i in range(len(buffer)) :
+                f.write(buffer[i])
+                f.write("\n")
 
     def update_and_send_to_buffer(self, new_phrase):
         self.audio_buffer.append(new_phrase)
@@ -158,3 +160,4 @@ if __name__ == "__main__":
                                  "Run this with 'list' to view available Microphones.", type=str)
     args = parser.parse_args()
 
+    
