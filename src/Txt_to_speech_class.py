@@ -1,4 +1,3 @@
-
 import argparse
 import io
 import os
@@ -12,11 +11,12 @@ from tempfile import NamedTemporaryFile
 from time import sleep
 from sys import platform
 
+
 class Transcriber:
     def __init__(self, args):
-        #setting up all the arguments into class variables
+        # setting up all the arguments into class variables
         self.args = args
-        self.recorder = sr.Recgonizer()
+        self.recorder = sr.Recognizer()
         self.recorder.energy_threshold = args.energy_threshold
         self.recorder.dynamic_energy_threshold = False
         self.data_queue = Queue()
@@ -24,19 +24,19 @@ class Transcriber:
         self.last_sample = bytes()
         self.model = self.load_model(args.model, args.non_english)
         self.temp_file = NamedTemporaryFile().name
-        self.output_file = open('hello.txt', w)
+        self.output_file = open('hello.txt', 'w')
         self.transcription = ['']
         self.audio_buffer = []
 
-    # load the model given the 
+    # load the model given the
     def load_model(self, model_name, non_english):
         if model_name != "large" and not non_english:
-            model_name = model_name + ".en" 
+            model_name = model_name + ".en"
         return whisper.load_model(model_name)
-    
+
     def get_microphone(self):
         if 'linux' in platform:
-            mic_name = self.args.deafualt_microphone
+            mic_name = self.args.default_microphone
             if not mic_name or mic_name == 'list':
                 print("Avaliable devices are: ")
                 for index, name in enumerate(sr.Microphone.list_microphone_names()):
@@ -51,19 +51,19 @@ class Transcriber:
 
     def record_callback(self, recgonizer, audio: sr.AudioData):
         data = audio.get_raw_data()
-        self.data_queue.put(data) 
+        self.data_queue.put(data)
 
     def send_to_tts(buffer):
         # fill this in later with the logic to send the text to the text to speech modle
-        with open(testing.txt, 'w+b') as f:
-            for i in range(len(buffer)) :
+        with open('testing.txt', 'w+b') as f:
+            for i in range(len(buffer)):
                 f.write(buffer[i])
                 f.write("\n")
 
     def update_and_send_to_buffer(self, new_phrase):
         self.audio_buffer.append(new_phrase)
 
-        if len(self.audio_buffer == 2):
+        if len(self.audio_buffer) == 2:
             self.send_to_tts(self.audio_buffer)
 
             self.audio_buffer = []
@@ -97,7 +97,7 @@ class Transcriber:
                         f.write(wav_data.read())
 
                     # Read the transcription.
-                    result = self.model.transcripe(self.temp_file, fp16=torch.cuda.is_available())
+                    result = self.model.transcribe(self.temp_file, fp16=torch.cuda.is_available())
                     text = result['text'].strip()
 
                     self.update_and_send_to_buffer(text)
@@ -110,7 +110,7 @@ class Transcriber:
                         self.transcription[-1] = text
 
                     # Clear the console to reprint the updated transcription.
-                    os.system('cls' if os.name=='nt' else 'clear')
+                    os.system('cls' if os.name == 'nt' else 'clear')
                     for line in self.transcription:
                         print(line)
                         self.source_file.write(line)
@@ -133,13 +133,14 @@ class Transcriber:
         self.source = self.get_microphone()
         if self.source is None:
             return
-        
+
         with self.source as source:
             self.recorder.adjust_for_ambient_noise(source)
             self.recorder.listen_in_background(source, self.record_callback, phrase_time_limit=self.args.record_timeout)
 
         print("Model loaded\n")
         self.transcribe_audio()
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -159,5 +160,6 @@ if __name__ == "__main__":
                             help="Default microphone name for SpeechRecognition. "
                                  "Run this with 'list' to view available Microphones.", type=str)
     args = parser.parse_args()
+
 
     
