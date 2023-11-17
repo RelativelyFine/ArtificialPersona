@@ -56,7 +56,7 @@ class Transcriber:
     def send_to_tts(buffer):
         # fill this in later with the logic to send the text to the text to speech modle
         with open('testing.txt', 'w+b') as f:
-            for i in range(len(buffer)):
+            for i in range(len(buffer)) :
                 f.write(buffer[i])
                 f.write("\n")
 
