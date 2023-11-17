@@ -161,5 +161,4 @@ if __name__ == "__main__":
                                  "Run this with 'list' to view available Microphones.", type=str)
     args = parser.parse_args()
 
-
     
