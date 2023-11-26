@@ -1,0 +1,3 @@
+cd to ./src/bark_stuff/
+python ./bark_test.py
+change the text to whatever you want it to say.
