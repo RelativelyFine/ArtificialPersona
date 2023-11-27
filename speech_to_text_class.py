@@ -1,16 +1,17 @@
 import argparse
 import io
 import os
+import threading
+from datetime import datetime, timedelta
+import time
+from queue import Queue
 import speech_recognition as sr
 import whisper
 import torch
 
-from datetime import datetime, timedelta
-from queue import Queue
 from tempfile import NamedTemporaryFile
 from time import sleep
 from sys import platform
-
 
 class Transcriber:
     def __init__(self, args):
@@ -53,22 +54,29 @@ class Transcriber:
         data = audio.get_raw_data()
         self.data_queue.put(data)
 
-    def send_to_tts(buffer):
-        # fill this in later with the logic to send the text to the text to speech modle
-        with open('testing.txt', 'w+b') as f:
-            for i in range(len(buffer)):
-                f.write(buffer[i])
-                f.write("\n")
+    def generate_tts(self, buffer):
+        if buffer:
+            print("Buffer contents to be sent to TTS:", buffer)  # New line added
+            # Logic to send the buffer to the TTS model 'voicebox'
+            print("Sending to TTS:", buffer)
+            # voicebox.send(buffer) # Replace with actual TTS API call
+        self.audio_buffer = []  # Reset the buffer
 
-    def update_and_send_to_buffer(self, new_phrase):
-        self.audio_buffer.append(new_phrase)
 
-        if len(self.audio_buffer) == 2:
-            self.send_to_tts(self.audio_buffer)
-
-            self.audio_buffer = []
+    def check_and_send_buffer(self):
+        """Periodically check if the buffer needs to be sent to TTS."""
+        while self.is_transcribing:
+            if len(self.audio_buffer) >= 2 or (datetime.utcnow() - self.last_transcription_time).seconds >= 5:
+                if self.audio_buffer:
+                    threading.Thread(target=self.generate_tts, args=(self.audio_buffer[:],)).start()
+                    self.audio_buffer = []
+            time.sleep(5)  # Check every 5 seconds
 
     def transcribe_audio(self):
+        self.is_transcribing = True
+        self.last_transcription_time = datetime.utcnow()
+        buffer_check_thread = threading.Thread(target=self.check_and_send_buffer)
+        buffer_check_thread.start()
         while True:
             try:
                 now = datetime.utcnow()
@@ -124,6 +132,8 @@ class Transcriber:
             except KeyboardInterrupt:
                 self.source_file.close()
                 break
+        self.is_transcribing = False
+        buffer_check_thread.join()    
 
         print("\n\nTranscription:")
         for line in self.transcription:
