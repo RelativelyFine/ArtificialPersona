@@ -29,6 +29,7 @@ class Transcriber:
         self.buffer_lock = threading.Lock()
         self.is_transcribing = False
         self.source = self.get_microphone()
+        self.phrase_time = datetime.utcnow()
 
     def load_model(self, model_name, non_english):
         if model_name != "large" and not non_english:
@@ -51,6 +52,8 @@ class Transcriber:
         while self.is_transcribing:
             now = datetime.utcnow()
             if not self.data_queue.empty():
+                # Update phrase_time at the start of processing
+                self.phrase_time = now
                 phrase_complete = False
                 if self.phrase_time and now - self.phrase_time > timedelta(seconds=self.args.phrase_timeout):
                     self.last_sample = bytes()
@@ -92,10 +95,9 @@ class Transcriber:
     def manage_buffer(self):
         while self.is_transcribing or self.audio_buffer:
             with self.buffer_lock:
+                # Check if the buffer is ready to be processed
                 if len(self.audio_buffer) >= 2 or (datetime.utcnow() - self.phrase_time).seconds >= 5:
-                    # Process buffer contents here
-                    print("Sending to TTS:", self.audio_buffer)
-                    self.audio_buffer.clear()
+                    self.send_to_tts()
             time.sleep(1)
 
     def start_transcription(self):
