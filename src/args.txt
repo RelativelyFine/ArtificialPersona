@@ -1,8 +1,0 @@
-args = {
-        'model': 'tiny',  # or whichever model you want
-        'non_english': False,  # set True if needed
-        'energy_threshold': 1000,
-        'record_timeout': 2,
-        'phrase_timeout': 3,
-        'default_microphone': 'pulse'  # or your specific microphone
-    }
