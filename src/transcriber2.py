@@ -52,8 +52,6 @@ class Transcriber:
         while self.is_transcribing:
             now = datetime.utcnow()
             if not self.data_queue.empty():
-                # Update phrase_time at the start of processing
-                self.phrase_time = now
                 phrase_complete = False
                 if self.phrase_time and now - self.phrase_time > timedelta(seconds=self.args.phrase_timeout):
                     self.last_sample = bytes()
@@ -77,9 +75,9 @@ class Transcriber:
                         self.audio_buffer.append(text)
                     else:
                         if self.audio_buffer:
-                            self.audio_buffer[-1] = text
+                            self.audio_buffer[-1] = text  # Update the last phrase
                         else:
-                            self.audio_buffer.append(text)
+                            self.audio_buffer.append(text)  # Add the first phrase
 
                 os.system('cls' if os.name == 'nt' else 'clear')
                 for line in self.transcription:
@@ -87,18 +85,17 @@ class Transcriber:
 
                 sleep(0.25)
     
-    def send_to_tts(self):
-        # Logic to print data from the buffer
-        print("Sending to TTS:", self.audio_buffer)
-        self.audio_buffer.clear()  # Clear buffer after processing
-
     def manage_buffer(self):
         while self.is_transcribing or self.audio_buffer:
             with self.buffer_lock:
-                # Check if the buffer is ready to be processed
                 if len(self.audio_buffer) >= 2 or (datetime.utcnow() - self.phrase_time).seconds >= 5:
                     self.send_to_tts()
             time.sleep(1)
+
+    def send_to_tts(self):
+        # Process the new phrases and then clear the buffer
+        print("Sending to TTS:", self.audio_buffer)
+        self.audio_buffer.clear()
 
     def start_transcription(self):
         with self.source as source:
