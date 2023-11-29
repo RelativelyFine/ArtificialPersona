@@ -1,0 +1,34 @@
+The Transcriber class is designed to perform real-time audio transcription using the Whisper model and the SpeechRecognition library. It efficiently handles transcription and subsequent processing of the transcribed text using a multithreaded approach. This ensures that the transcription process is not blocked by text processing, leading to improved performance and responsiveness.
+
+Class Structure
+Initialization (__init__ method): Sets up the transcription environment, including loading the Whisper model, configuring the speech recognizer, and initializing necessary variables like queues and locks for thread safety.
+
+Model Loading (load_model method): Loads the specified Whisper model, with an option to choose a non-English model.
+
+Microphone Setup (get_microphone method): Configures the microphone for audio input, with special handling for Linux platforms if a default microphone is specified.
+
+Audio Recording Callback (record_callback method): A callback function that is triggered when new audio data is available. It stores the raw audio data in a queue for processing.
+
+Transcription Process (transcribe method): Runs in its own thread, continuously processing audio data from the queue, transcribing it using the Whisper model, and updating the audio buffer with new transcribed text.
+
+Buffer Management (manage_buffer method): Also running in its own thread, this method regularly checks the audio buffer. If certain conditions are met (buffer length or time since last processing), it sends the buffer contents for further processing (e.g., Text-to-Speech) and then clears the buffer.
+
+Sending Data to TTS (send_to_tts method): Processes the contents of the audio buffer. Currently, it simply prints the buffer contents to the console and clears the buffer.
+
+Starting Transcription (start_transcription method): Initializes and starts the transcription and buffer management threads, ensuring the transcription process begins and runs concurrently with buffer management.
+
+Multithreading and Performance
+Concurrent Threads: The class uses two main threads – one for transcription (transcription_thread) and another for buffer management (buffer_thread). This allows the system to continue transcribing audio while simultaneously managing and processing the transcription buffer.
+
+Thread Safety: To ensure thread safety, especially when accessing and modifying the shared audio buffer (self.audio_buffer), a threading lock (self.buffer_lock) is used. This lock prevents simultaneous access to the buffer by multiple threads, avoiding potential data conflicts or race conditions.
+
+Efficient Resource Management: The use of threads helps in making efficient use of system resources. While one thread is waiting for new audio data, the other can process the existing data, thus keeping the CPU cycles optimally utilized.
+
+Usage
+To use the Transcriber class:
+
+Initialization: Instantiate the class with the necessary arguments (model type, energy threshold, etc.).
+
+Start Transcription: Call the start_transcription method to begin the real-time transcription process.
+
+Graceful Shutdown: To stop the transcription, a keyboard interrupt (Ctrl+C) can be used. The class handles this gracefully, ensuring threads are properly closed.
