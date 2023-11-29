@@ -4,6 +4,8 @@ import os
 import speech_recognition as sr
 import whisper
 import torch
+import threading
+import time
 
 from datetime import datetime, timedelta
 from queue import Queue
@@ -11,93 +13,111 @@ from tempfile import NamedTemporaryFile
 from time import sleep
 from sys import platform
 
-
 class Transcriber:
-    def __init__(self, model="tiny", non_english=False, energy_threshold=1000,
-                 record_timeout=2, phrase_timeout=3, default_microphone=None):
-        self.model = model if not non_english else model + ".en"
-        self.energy_threshold = energy_threshold
-        self.record_timeout = record_timeout
-        self.phrase_timeout = phrase_timeout
-        self.default_microphone = default_microphone
-        self.audio_model = whisper.load_model(self.model)
+    def __init__(self, args):
+        self.args = args
+        self.model = self.load_model(args.model, args.non_english)
         self.recorder = sr.Recognizer()
-        self.recorder.energy_threshold = self.energy_threshold
+        self.recorder.energy_threshold = args.energy_threshold
         self.recorder.dynamic_energy_threshold = False
         self.data_queue = Queue()
-        self.transcription = ['']
         self.phrase_time = None
         self.last_sample = bytes()
+        self.temp_file = NamedTemporaryFile().name
+        self.transcription = ['']
+        self.audio_buffer = []
+        self.buffer_lock = threading.Lock()
+        self.is_transcribing = False
+        self.source = self.get_microphone()
 
-        self.setup_microphone()
+    def load_model(self, model_name, non_english):
+        if model_name != "large" and not non_english:
+            model_name = model_name + ".en"
+        return whisper.load_model(model_name)
 
-    def setup_microphone(self):
-        if 'linux' in platform and self.default_microphone:
+    def get_microphone(self):
+        if 'linux' in platform and self.args.default_microphone:
             for index, name in enumerate(sr.Microphone.list_microphone_names()):
-                if self.default_microphone in name:
-                    self.source = sr.Microphone(sample_rate=16000, device_index=index)
-                    return
-        self.source = sr.Microphone(sample_rate=16000)
+                if self.args.default_microphone in name:
+                    return sr.Microphone(sample_rate=16000, device_index=index)
+        return sr.Microphone(sample_rate=16000)
 
-    def record_callback(self, _, audio: sr.AudioData):
+    def record_callback(self, recognizer, audio: sr.AudioData):
         data = audio.get_raw_data()
         self.data_queue.put(data)
 
-    def start_recording(self):
-        with self.source:
-            self.recorder.adjust_for_ambient_noise(self.source)
-        self.recorder.listen_in_background(self.source, self.record_callback, phrase_time_limit=self.record_timeout)
-
     def transcribe(self):
-        temp_file = NamedTemporaryFile().name
-        print("Model loaded.\n")
-        source_file = open('hello.txt', 'w')
-        try:
-            while True:
-                now = datetime.utcnow()
-                if not self.data_queue.empty():
-                    phrase_complete = False
-                    if self.phrase_time and now - self.phrase_time > timedelta(seconds=self.phrase_timeout):
-                        self.last_sample = bytes()
-                        phrase_complete = True
-                    self.phrase_time = now
+        self.is_transcribing = True
+        while self.is_transcribing:
+            now = datetime.utcnow()
+            if not self.data_queue.empty():
+                phrase_complete = False
+                if self.phrase_time and now - self.phrase_time > timedelta(seconds=self.args.phrase_timeout):
+                    self.last_sample = bytes()
+                    phrase_complete = True
+                self.phrase_time = now
 
-                    while not self.data_queue.empty():
-                        data = self.data_queue.get()
-                        self.last_sample += data
+                while not self.data_queue.empty():
+                    data = self.data_queue.get()
+                    self.last_sample += data
 
-                    audio_data = sr.AudioData(self.last_sample, self.source.SAMPLE_RATE, self.source.SAMPLE_WIDTH)
-                    wav_data = io.BytesIO(audio_data.get_wav_data())
+                audio_data = sr.AudioData(self.last_sample, self.source.SAMPLE_RATE, self.source.SAMPLE_WIDTH)
+                wav_data = io.BytesIO(audio_data.get_wav_data())
+                with open(self.temp_file, 'w+b') as f:
+                    f.write(wav_data.read())
 
-                    with open(temp_file, 'w+b') as f:
-                        f.write(wav_data.read())
+                result = self.model.transcribe(self.temp_file, fp16=torch.cuda.is_available())
+                text = result['text'].strip()
 
-                    result = self.audio_model.transcribe(temp_file, fp16=torch.cuda.is_available())
-                    text = result['text'].strip()
-
+                with self.buffer_lock:
                     if phrase_complete:
-                        self.transcription.append(text)
+                        self.audio_buffer.append(text)
                     else:
-                        self.transcription[-1] = text
+                        if self.audio_buffer:
+                            self.audio_buffer[-1] = text
+                        else:
+                            self.audio_buffer.append(text)
 
-                    os.system('cls' if os.name == 'nt' else 'clear')
-                    for line in self.transcription:
-                        print(line)
-                        source_file.write(line)
+                os.system('cls' if os.name == 'nt' else 'clear')
+                for line in self.transcription:
+                    print(line)
 
-                    source_file.flush()
-                    sleep(0.25)
-        except KeyboardInterrupt:
-            source_file.close()
-        finally:
-            print("\n\nTranscription:")
-            for line in self.transcription:
-                print(line)
+                sleep(0.25)
+    
+    def send_to_tts(self):
+        # Logic to print data from the buffer
+        print("Sending to TTS:", self.audio_buffer)
+        self.audio_buffer.clear()  # Clear buffer after processing
+
+    def manage_buffer(self):
+        while self.is_transcribing or self.audio_buffer:
+            with self.buffer_lock:
+                if len(self.audio_buffer) >= 2 or (datetime.utcnow() - self.phrase_time).seconds >= 5:
+                    # Process buffer contents here
+                    print("Sending to TTS:", self.audio_buffer)
+                    self.audio_buffer.clear()
+            time.sleep(1)
+
+    def start_transcription(self):
+        with self.source as source:
+            self.recorder.adjust_for_ambient_noise(source, duration=1)
+        
+        self.recorder.listen_in_background(self.source, self.record_callback, phrase_time_limit=self.args.record_timeout)
+
+        print("Model loaded.\nStarting transcription...")
+        self.is_transcribing = True
+        transcription_thread = threading.Thread(target=self.transcribe)
+        buffer_thread = threading.Thread(target=self.manage_buffer)
+
+        transcription_thread.start()
+        buffer_thread.start()
+
+        transcription_thread.join()
+        buffer_thread.join()
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model", default="tiny", help="Model to use",
-                        choices=["tiny", "base", "small", "medium", "large"])
+    parser.add_argument("--model", default="tiny", help="Model to use", choices=["tiny", "base", "small", "medium", "large"])
     parser.add_argument("--non_english", action='store_true', help="Don't use the english model.")
     parser.add_argument("--energy_threshold", default=1000, help="Energy level for mic to detect.", type=int)
     parser.add_argument("--record_timeout", default=2, help="How real time the recording is in seconds.", type=float)
@@ -105,20 +125,12 @@ def main():
 
     if 'linux' in platform:
         parser.add_argument("--default_microphone", default='pulse', help="Default microphone name for SpeechRecognition. Run this with 'list' to view available Microphones.", type=str)
-        args = parser.parse_args()
-        default_microphone = args.default_microphone
-    else:
-        args = parser.parse_args()
-        default_microphone = None
 
-    transcriber = Transcriber(model=args.model, non_english=args.non_english,
-                              energy_threshold=args.energy_threshold, record_timeout=args.record_timeout,
-                              phrase_timeout=args.phrase_timeout, default_microphone=default_microphone)
-    
-    print("running")
-    transcriber.start_recording()
-    transcriber.transcribe()
+    args = parser.parse_args()
+
+    transcriber = Transcriber(args)
+    print("Running...")
+    transcriber.start_transcription()
 
 if __name__ == "__main__":
     main()
-
