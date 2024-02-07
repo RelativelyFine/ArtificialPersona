@@ -45,9 +45,9 @@ class AudioUtils:
     def get_audio_data(self, data_queue):
         audio_data = []
         while not data_queue.empty():
-            data, timestamp = data_queue.get()
+            data = data_queue.get()
             self.last_sample += data
-            audio_data.append((data, timestamp))
+            audio_data.append(data)
 
         if self.last_sample:
             audio_numpy = np.frombuffer(self.last_sample, dtype=np.int16)
@@ -60,6 +60,7 @@ class AudioUtils:
         if audio_data is None:
             return ""
         try:
+
             return recognizer.recognize_whisper(audio_data, model=self.args.model)
         except sr.UnknownValueError:
             return ""

@@ -53,8 +53,8 @@ class Transcriber:
                 self.previousQueueEmpty = True
 
             self.audio_utils.update_phrase_time(now)
-            audio_data = self.audio_utils.get_audio_data(self.data_queue)
-            text = self.audio_utils.transcribe_audio(audio_data, recognizer)
+            audio_processed, audio_data = self.audio_utils.get_audio_data(self.data_queue)
+            text = self.audio_utils.transcribe_audio(audio_processed, recognizer)
             self.process_transcription(text)
 
     def record_callback(self, _, audio: sr.AudioData) -> None:

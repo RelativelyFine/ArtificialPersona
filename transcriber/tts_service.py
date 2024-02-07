@@ -2,6 +2,7 @@ from concurrent.futures import ThreadPoolExecutor
 import nltk
 import re
 from elevenlabs import generate, stream
+from bark import SAMPLE_RATE, generate_audio, preload_models
 
 class TTSService:
     def __init__(self, args):
@@ -9,6 +10,7 @@ class TTSService:
         self.buffered_messages = ''
         self.waitingAudios = 0
         self.audio_queue = None
+        preload_models()
 
     def deliver_to_tts(self, curr_transcription, audio_queue, waitingAudios):
         self.audio_queue = audio_queue
@@ -49,13 +51,14 @@ class TTSService:
         return None
 
     def generate_audio(self, text):
-        audio = generate(
-            api_key=self.args.eleven_labs_api_key,
-            text=text,
-            voice="Glinda",
-            model="eleven_monolingual_v1",
-            stream=True
-        )
+        # audio = generate(
+        #     api_key=self.args.eleven_labs_api_key,
+        #     text=text,
+        #     voice="Glinda",
+        #     model="eleven_monolingual_v1",
+        #     stream=True
+        # )
+        audio = generate_audio(text)
         self.waitingAudios += 1
         self.audio_queue.put(audio)
 
