@@ -14,7 +14,7 @@ def parse_args():
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--eleven_labs_api_key", default=eleven_labs, help="API key for Eleven Labs TTS", type=str)
-    parser.add_argument("--model", default="tiny", help="Model to use", choices=["tiny", "base", "small", "medium", "large"])
+    parser.add_argument("--model", default="medium", help="Model to use", choices=["tiny", "base", "small", "medium", "large"])
     parser.add_argument("--non_english", action='store_true', help="Don't use the english model.")
     parser.add_argument("--energy_threshold", default=300, help="Energy level for mic to detect.", type=int)
     parser.add_argument("--record_timeout", default=1.2, help="How real time the recording is in seconds.", type=float)

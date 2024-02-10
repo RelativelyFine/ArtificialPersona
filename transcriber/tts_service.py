@@ -1,8 +1,12 @@
 from concurrent.futures import ThreadPoolExecutor
 import nltk
 import re
-from elevenlabs import generate, stream
-from bark import SAMPLE_RATE, generate_audio, preload_models
+# from elevenlabs import generate, stream
+from bark import SAMPLE_RATE, generate_audio
+from scipy.io.wavfile import write as write_wav
+import os
+from datetime import datetime
+import pyaudio
 
 class TTSService:
     def __init__(self, args):
@@ -10,7 +14,8 @@ class TTSService:
         self.buffered_messages = ''
         self.waitingAudios = 0
         self.audio_queue = None
-        preload_models()
+        self.p = pyaudio.PyAudio()
+        self.stream = self.p.open(format=pyaudio.paFloat32, channels=1, rate=SAMPLE_RATE, output=True)
 
     def deliver_to_tts(self, curr_transcription, audio_queue, waitingAudios):
         self.audio_queue = audio_queue
@@ -58,7 +63,7 @@ class TTSService:
         #     model="eleven_monolingual_v1",
         #     stream=True
         # )
-        audio = generate_audio(text)
+        audio = generate_audio(text, history_prompt="v2/en_speaker_6")
         self.waitingAudios += 1
         self.audio_queue.put(audio)
 
@@ -68,9 +73,29 @@ class TTSService:
             if audio is None:  # We're done streaming
                 break
             self.waitingAudios -= 1
-            stream(audio)
+
+            # Stream audio
+            audio_bytes = audio.tobytes()
+            self.stream.write(audio_bytes)
+            # stream(audio)
+
+            # save audio to disk
+            date= datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+            write_wav(f'bark_generation{date}.wav', SAMPLE_RATE, audio)
+
+
             self.audio_queue.task_done()
 
     def is_sentence(self, text):
         pattern = r'^[^.]*[^\.0-9][.!?]$'
         return re.match(pattern, text) is not None
+
+    def cleanup_audio_resources(self):
+        if self.stream is not None:
+            self.stream.stop_stream()
+            self.stream.close()
+            self.stream = None
+
+        if self.p is not None:
+            self.p.terminate()
+            self.p = None

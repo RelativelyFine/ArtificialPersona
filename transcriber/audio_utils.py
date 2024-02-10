@@ -1,7 +1,7 @@
 import speech_recognition as sr
 import numpy as np
 import noisereduce as nr
-from datetime import datetime, timedelta
+from datetime import timedelta
 from sys import platform
 
 class AudioUtils:
@@ -48,12 +48,11 @@ class AudioUtils:
             data = data_queue.get()
             self.last_sample += data
             audio_data.append(data)
-
         if self.last_sample:
             audio_numpy = np.frombuffer(self.last_sample, dtype=np.int16)
             reduced_noise = nr.reduce_noise(y=audio_numpy, sr=self.source.SAMPLE_RATE) if audio_numpy.size != 0 else audio_numpy
             audio_processed = sr.AudioData(reduced_noise.tobytes(), self.source.SAMPLE_RATE, self.source.SAMPLE_WIDTH)
-            return audio_processed, audio_data
+            return audio_data, audio_processed
         return None, None
 
     def transcribe_audio(self, audio_data, recognizer):
