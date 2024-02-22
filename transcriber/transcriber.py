@@ -66,10 +66,10 @@ class Transcriber:
     def process_transcription(self, text):
         if self.previousQueueEmpty:
             self.user_inputs_since_last_prompt.append(text)
-            temp_prompt = self.user_inputs_since_last_prompt.copy()
-            self.transcription.append(temp_prompt)
+            curr_transcription = self.user_inputs_since_last_prompt.copy()
+            self.transcription.append(curr_transcription)
             self.user_inputs_since_last_prompt = ['']
-            self.tts_service.deliver_to_tts(temp_prompt, self.audio_queue, self.waitingAudios)
+            self.tts_service.deliver_to_tts(curr_transcription, self.audio_queue, self.waitingAudios)
             # Clear the console to reprint the updated transcription.
             os.system('cls' if os.name=='nt' else 'clear')
             for line in self.transcription:

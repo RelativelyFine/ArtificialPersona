@@ -1,15 +1,18 @@
 from concurrent.futures import ThreadPoolExecutor
 import nltk
 import re
-# from elevenlabs import generate, stream
+from elevenlabs import generate, stream
 from bark import SAMPLE_RATE, generate_audio
 from scipy.io.wavfile import write as write_wav
-import os
+from time import sleep
 from datetime import datetime
+from translator import translate
 import pyaudio
+from openai import OpenAI
 
 class TTSService:
     def __init__(self, args):
+        self.client = OpenAI(api_key=args.openai_api_key)
         self.args = args
         self.buffered_messages = ''
         self.waitingAudios = 0
@@ -36,11 +39,12 @@ class TTSService:
                 continue
 
             sentence = self.get_complete_sentence(sentences)
-            if sentence:
-                self.generate_audio(sentence)
+            if sentence is None:
+                continue
+            self.generate_translate_audio(sentence)
 
         if self.buffered_messages:
-            self.generate_audio(self.buffered_messages)
+            self.generate_translate_audio(self.buffered_messages)
             self.buffered_messages = ''
 
         # Add a sentinel to signal we're done generating
@@ -55,15 +59,20 @@ class TTSService:
             return sentence
         return None
 
-    def generate_audio(self, text):
-        # audio = generate(
-        #     api_key=self.args.eleven_labs_api_key,
-        #     text=text,
-        #     voice="Glinda",
-        #     model="eleven_monolingual_v1",
-        #     stream=True
-        # )
-        audio = generate_audio(text, history_prompt="v2/en_speaker_6")
+    def generate_translate_audio(self, text):
+        if self.args.from_language != self.args.to_language:
+            print(f"Translating from {self.args.from_language} to {self.args.to_language}")
+            text = translate(self.args.from_language, self.args.to_language, text, self.client)
+        if self.args.tts_model == "elevenlabs":
+            audio = generate(
+                api_key=self.args.eleven_labs_api_key,
+                text=text,
+                voice=self.args.elevenlabs_voice,
+                model="eleven_multilingual_v2",
+                stream=True
+            )
+        elif self.args.tts_model == "bark":
+            audio = generate_audio(text, history_prompt=self.args.bark_language) #Bark audio 
         self.waitingAudios += 1
         self.audio_queue.put(audio)
 
@@ -73,18 +82,20 @@ class TTSService:
             if audio is None:  # We're done streaming
                 break
             self.waitingAudios -= 1
+            if self.args.tts_model == "elevenlabs":
+                stream(audio)
+            elif self.args.tts_model == "bark":
+                # Stream audio
+                audio_bytes = audio.tobytes()
+                self.stream.write(audio_bytes)
+                # stream(audio)
 
-            # Stream audio
-            audio_bytes = audio.tobytes()
-            self.stream.write(audio_bytes)
-            # stream(audio)
-
-            # save audio to disk
-            date= datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-            write_wav(f'bark_generation{date}.wav', SAMPLE_RATE, audio)
-
+                # save audio to disk
+                date= datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+                write_wav(f'bark_generation{date}.wav', SAMPLE_RATE, audio)
 
             self.audio_queue.task_done()
+            sleep(0.2)
 
     def is_sentence(self, text):
         pattern = r'^[^.]*[^\.0-9][.!?]$'
