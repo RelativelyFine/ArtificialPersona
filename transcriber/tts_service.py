@@ -16,6 +16,7 @@ class TTSService:
         self.audio_queue = None
         self.p = pyaudio.PyAudio()
         self.stream = self.p.open(format=pyaudio.paFloat32, channels=1, rate=SAMPLE_RATE, output=True)
+        self.audio_bytes = None
 
     def deliver_to_tts(self, curr_transcription, audio_queue, waitingAudios):
         self.audio_queue = audio_queue
@@ -72,19 +73,18 @@ class TTSService:
             audio = self.audio_queue.get()
             if audio is None:  # We're done streaming
                 break
+            self.audio_bytes = audio.tobytes()
             self.waitingAudios -= 1
-
             # Stream audio
-            audio_bytes = audio.tobytes()
-            self.stream.write(audio_bytes)
+
+            # self.stream.write(audio_bytes)
             # stream(audio)
 
             # save audio to disk
-            date= datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-            write_wav(f'bark_generation{date}.wav', SAMPLE_RATE, audio)
-
-
+            # date= datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+            # write_wav(f'bark_generation{date}.wav', SAMPLE_RATE, audio)
             self.audio_queue.task_done()
+            
 
     def is_sentence(self, text):
         pattern = r'^[^.]*[^\.0-9][.!?]$'
