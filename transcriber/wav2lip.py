@@ -4,11 +4,12 @@ import cv2
 import datetime
 import speech_recognition as sr
 import numpy as np
+import threading
 
 sys.path.insert(1, "./Wav2Lip/")
 import inference
 
-def wav2lip():
+def video_processing_thread():
     video_feed = cv2.VideoCapture()
     
     frames = []
@@ -40,3 +41,6 @@ def wav2lip():
             frames.clear()
             last_frames.clear()
             start = end
+def wav2lip():
+    video_thread = threading.Thread(target=video_processing_thread)
+    video_thread.start()
