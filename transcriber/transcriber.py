@@ -69,13 +69,12 @@ class Transcriber:
             curr_transcription = self.user_inputs_since_last_prompt.copy()
             self.transcription.append(curr_transcription)
             self.user_inputs_since_last_prompt = ['']
+            # os.system('cls' if os.name=='nt' else 'clear')
+            # for line in self.transcription:
+            #     print(line)
+            # # Flush stdout.
+            # print('', end='', flush=True)
             self.tts_service.deliver_to_tts(curr_transcription, self.audio_queue, self.waitingAudios)
-            # Clear the console to reprint the updated transcription.
-            os.system('cls' if os.name=='nt' else 'clear')
-            for line in self.transcription:
-                print(line)
-            # Flush stdout.
-            print('', end='', flush=True)
         else:
             self.transcription[-1] = text
             self.user_inputs_since_last_prompt[-1] = text

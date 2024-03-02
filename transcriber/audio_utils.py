@@ -48,6 +48,7 @@ class AudioUtils:
             data = data_queue.get()
             self.last_sample += data
             audio_data.append(data)
+            data_queue.task_done()
         if self.last_sample:
             audio_numpy = np.frombuffer(self.last_sample, dtype=np.int16)
             reduced_noise = nr.reduce_noise(y=audio_numpy, sr=self.source.SAMPLE_RATE) if audio_numpy.size != 0 else audio_numpy
